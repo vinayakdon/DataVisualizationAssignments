@@ -64,7 +64,7 @@ Dataset source: Kaggle (Bike Sharing Demand – `train.csv`)
   [https://github.com/username/bike-sharing-dashboard](https://github.com/vinayakdon/DataVisualizationAssignments)
 
 - **Streamlit App:**  
-  https://bike-sharing-dashboard.streamlit.app
+  [https://bike-sharing-dashboard.streamlit.app](https://datavisualizationassignment.streamlit.app)
 
 ---
 
