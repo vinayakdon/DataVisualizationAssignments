@@ -5,16 +5,24 @@ import matplotlib.pyplot as plt
 
 
 st.set_page_config(
-    page_title="Bike Sharing Dashboard",
+    page_title="Bike Sharing Dashboard (Cleaned Data)",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# added the customized css to look it better
+
+plt.rcParams.update({
+    "font.size": 9,
+    "axes.titlesize": 11,
+    "axes.labelsize": 9,
+    "xtick.labelsize": 8,
+    "ytick.labelsize": 8,
+    "legend.fontsize": 8,
+})
+
 
 CUSTOM_CSS = """
 <style>
-/* --- App background + typography --- */
 .stApp {
     background: radial-gradient(1200px circle at 10% 10%, rgba(99, 102, 241, 0.10), transparent 55%),
                 radial-gradient(900px circle at 90% 20%, rgba(16, 185, 129, 0.10), transparent 50%),
@@ -25,20 +33,14 @@ CUSTOM_CSS = """
 html, body, [class*="css"]  {
     font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
-
-/* --- Make main content a bit narrower on very wide screens (optional) --- */
 .block-container {
     padding-top: 1.2rem;
     padding-bottom: 2.5rem;
     max-width: 1400px;
 }
-
-/* --- Hide Streamlit default menu/footer for a cleaner dashboard feel --- */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
-header {visibility: hidden;}
 
-/* --- Sidebar styling --- */
 section[data-testid="stSidebar"] {
     background: linear-gradient(180deg, rgba(17, 24, 39, 0.92), rgba(15, 23, 42, 0.92));
     border-right: 1px solid rgba(255,255,255,0.08);
@@ -49,7 +51,6 @@ section[data-testid="stSidebar"] span {
     color: #E5E7EB !important;
 }
 
-/* --- Hero header --- */
 .hero {
     padding: 18px 18px 14px 18px;
     border: 1px solid rgba(255,255,255,0.10);
@@ -67,8 +68,6 @@ section[data-testid="stSidebar"] span {
     color: rgba(229,231,235,0.85);
     font-size: 0.98rem;
 }
-
-/* --- Section cards (containers around charts) --- */
 .card {
     border: 1px solid rgba(255,255,255,0.10);
     border-radius: 16px;
@@ -76,12 +75,6 @@ section[data-testid="stSidebar"] span {
     background: rgba(15, 23, 42, 0.55);
     box-shadow: 0 8px 22px rgba(0,0,0,0.18);
 }
-.card h3 {
-    margin-top: 0.2rem;
-    margin-bottom: 0.8rem;
-}
-
-/* --- KPI row: make metrics look like cards --- */
 div[data-testid="metric-container"] {
     background: rgba(15, 23, 42, 0.55);
     border: 1px solid rgba(255,255,255,0.10);
@@ -95,29 +88,11 @@ div[data-testid="metric-container"] label {
 div[data-testid="metric-container"] div {
     color: #E5E7EB !important;
 }
-
-/* --- Divider line (make it subtle) --- */
 hr {
     border: none;
     height: 1px;
     background: rgba(255,255,255,0.10);
     margin: 1.1rem 0 1.1rem 0;
-}
-
-/* --- Improve widget spacing --- */
-[data-testid="stSidebar"] .stSlider,
-[data-testid="stSidebar"] .stMultiSelect,
-[data-testid="stSidebar"] .stDateInput {
-    margin-bottom: 0.6rem;
-}
-
-/* --- Optional: sticky sidebar (works in many layouts) --- */
-section[data-testid="stSidebar"] > div {
-    position: sticky;
-    top: 0;
-    height: 100vh;
-    overflow-y: auto;
-    padding-top: 0.2rem;
 }
 </style>
 """
@@ -127,93 +102,94 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 st.markdown(
     """
     <div class="hero">
-        <h1>Bike Sharing Demand Dashboard</h1>
-        <p>Interactive dashboard summarizing EDA + visualization insights (Assignments 1 & 2).</p>
+        <h1>🚲 Bike Sharing Demand Dashboard (Cleaned Data)</h1>
+        <p>Streamlit dashboard built using the cleaned dataset used in Assignment 2 visualizations.</p>
     </div>
     """,
     unsafe_allow_html=True
 )
 
 
-# Data loading
-
 @st.cache_data
 def load_data():
-    df = pd.read_csv("train.csv")
-    df["datetime"] = pd.to_datetime(df["datetime"])
-    df["date"] = df["datetime"].dt.date
-    df["hour"] = df["datetime"].dt.hour
-    df["month"] = df["datetime"].dt.month
+    df = pd.read_csv("newtrain.csv")
+
+    # Some safety conversions
+    for col in ["year", "month", "day_of_week", "hour_of_day", "holiday", "workingday", "weather"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Ensure strings for these
+    if "season" in df.columns:
+        df["season"] = df["season"].astype(str).str.lower()
+    if "day_period" in df.columns:
+        df["day_period"] = df["day_period"].astype(str).str.lower()
+
     return df
 
 df = load_data()
 
 
-# Sidebar filters widget as slider
+st.sidebar.markdown("## 🔎 Filters")
+st.sidebar.caption("Filters for the cleaned dataset (Assignment 2).")
 
-st.sidebar.markdown("## Filters")
-st.sidebar.caption("Use the controls below to refine the dashboard.")
+years = sorted(df["year"].dropna().unique().astype(int).tolist()) if "year" in df.columns else []
+months = list(range(1, 13)) if "month" in df.columns else []
+hours = (0, 23) if "hour_of_day" in df.columns else (0, 23)
 
-min_date = df["date"].min()
-max_date = df["date"].max()
-
-with st.sidebar.expander("📅 Date Filter", expanded=True):
-    date_range = st.date_input(
-        "Select Date Range",
-        value=(min_date, max_date),
-        min_value=min_date,
-        max_value=max_date
-    )
-
-season_map = {1: "Spring", 2: "Summer", 3: "Fall", 4: "Winter"}
-weather_map = {1: "Clear/Few clouds", 2: "Mist/Cloudy", 3: "Light Snow/Rain", 4: "Heavy Rain/Snow"}
-
-df["season_name"] = df["season"].map(season_map)
-df["weather_name"] = df["weather"].map(weather_map)
+with st.sidebar.expander("🗓️ Time Filters", expanded=True):
+    year_sel = st.multiselect("Year", options=years, default=years if years else None)
+    month_sel = st.multiselect("Month", options=months, default=months)
+    hour_range = st.slider("Hour Range", 0, 23, (0, 23))
 
 with st.sidebar.expander("🌦️ Conditions", expanded=True):
-    season_sel = st.multiselect(
-        "Season",
-        options=sorted(df["season_name"].unique()),
-        default=sorted(df["season_name"].unique())
-    )
-    weather_sel = st.multiselect(
-        "Weather",
-        options=sorted(df["weather_name"].unique()),
-        default=sorted(df["weather_name"].unique())
-    )
+    season_opts = sorted(df["season"].dropna().unique().tolist()) if "season" in df.columns else []
+    weather_opts = sorted(df["weather"].dropna().unique().astype(int).tolist()) if "weather" in df.columns else []
 
-with st.sidebar.expander("Time & Temperature", expanded=True):
-    hour_range = st.slider("Hour Range", 0, 23, (0, 23))
-    temp_range = st.slider(
-        "Temperature Range (°C)",
-        float(df["temp"].min()),
-        float(df["temp"].max()),
-        (float(df["temp"].min()), float(df["temp"].max()))
-    )
+    season_sel = st.multiselect("Season", options=season_opts, default=season_opts)
+    weather_sel = st.multiselect("Weather Category", options=weather_opts, default=weather_opts)
+
+with st.sidebar.expander("🌡️ Weather Ranges", expanded=True):
+    temp_min, temp_max = float(df["temp"].min()), float(df["temp"].max())
+    temp_range = st.slider("Temperature Range (°C)", temp_min, temp_max, (temp_min, temp_max))
+
+    hum_min, hum_max = float(df["humidity"].min()), float(df["humidity"].max())
+    humidity_range = st.slider("Humidity Range", hum_min, hum_max, (hum_min, hum_max))
+
+with st.sidebar.expander("🏢 Day Type", expanded=True):
+    working_sel = st.multiselect("Working Day", options=[0, 1], default=[0, 1])
 
 st.sidebar.markdown("---")
-st.sidebar.caption("Tip: Try narrowing to commute hours (7–10, 16–19).")
+st.sidebar.caption("Tip: Working day = 1, Non-working day = 0")
 
-
-# Apply filters in the slider
 
 filtered = df.copy()
 
-if isinstance(date_range, tuple) and len(date_range) == 2:
-    start_date, end_date = date_range
-    filtered = filtered[(filtered["date"] >= start_date) & (filtered["date"] <= end_date)]
+if "year" in filtered.columns and year_sel:
+    filtered = filtered[filtered["year"].isin(year_sel)]
+
+if "month" in filtered.columns and month_sel:
+    filtered = filtered[filtered["month"].isin(month_sel)]
+
+if "hour_of_day" in filtered.columns:
+    filtered = filtered[filtered["hour_of_day"].between(hour_range[0], hour_range[1], inclusive="both")]
+
+if "season" in filtered.columns and season_sel:
+    filtered = filtered[filtered["season"].isin(season_sel)]
+
+if "weather" in filtered.columns and weather_sel:
+    filtered = filtered[filtered["weather"].isin(weather_sel)]
 
 filtered = filtered[
-    (filtered["season_name"].isin(season_sel)) &
-    (filtered["weather_name"].isin(weather_sel)) &
-    (filtered["hour"].between(hour_range[0], hour_range[1], inclusive="both")) &
-    (filtered["temp"].between(temp_range[0], temp_range[1], inclusive="both"))
+    (filtered["temp"].between(temp_range[0], temp_range[1], inclusive="both")) &
+    (filtered["humidity"].between(humidity_range[0], humidity_range[1], inclusive="both"))
 ]
 
+if "workingday" in filtered.columns and working_sel:
+    filtered = filtered[filtered["workingday"].isin(working_sel)]
 
 
-st.markdown("### Key Metrics")
+st.markdown("### 📌 Key Metrics")
 k1, k2, k3, k4 = st.columns(4)
 k1.metric("Rows (filtered)", f"{len(filtered):,}")
 k2.metric("Avg Count", f"{filtered['count'].mean():.1f}")
@@ -223,70 +199,82 @@ k4.metric("Avg Registered", f"{filtered['registered'].mean():.1f}")
 st.markdown("---")
 
 
-
-st.markdown("### 📊 Insights")
+st.markdown("### 📊 Visualizations (Assignment 2)")
 
 col1, col2 = st.columns(2)
 
-
+# 1: Mean hourly rentals by working vs non-working days 
 with col1:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("1) Average Demand by Hour")
-    fig, ax = plt.subplots()
-    hour_avg = filtered.groupby("hour")["count"].mean().reset_index()
-    sns.lineplot(data=hour_avg, x="hour", y="count", ax=ax, color='orange')
-    ax.set_xlabel("Hour")
-    ax.set_ylabel("Average Count")
+    st.subheader("1) Mean Rentals by Hour (Working vs Non-working)")
+
+    mean_hourly = filtered.groupby(["hour_of_day", "workingday"])["count"].mean().reset_index()
+
+    fig, ax = plt.subplots(figsize=(6, 3))
+    sns.lineplot(
+        data=mean_hourly,
+        x="hour_of_day",
+        y="count",
+        hue="workingday",
+        marker="o",
+        ax=ax
+    )
+    ax.set_xlabel("Hour of Day")
+    ax.set_ylabel("Mean Total Rentals")
+    ax.legend(title="Working Day", labels=["Non-working (0)", "Working (1)"])
     st.pyplot(fig, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
+# 2: Mean rentals by month 
 with col2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("2) Average Demand by Season")
-    fig, ax = plt.subplots()
-    season_avg = filtered.groupby("season_name")["count"].mean().reindex(["Spring", "Summer", "Fall", "Winter"]).reset_index()
-    sns.barplot(data=season_avg, x="season_name", y="count", ax=ax)
-    ax.set_xlabel("Season")
-    ax.set_ylabel("Average Count")
+    st.subheader("2) Mean Rentals by Month (Both Years Combined)")
+
+    mean_by_month = filtered.groupby("month")["count"].mean().reset_index()
+
+    fig, ax = plt.subplots(figsize=(6, 3))
+    sns.barplot(data=mean_by_month, x="month", y="count", ax=ax, palette="viridis")
+    ax.set_xlabel("Month")
+    ax.set_ylabel("Mean Total Rentals")
     st.pyplot(fig, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-
-
-# 3: Count by weather (full width)
+# 3: Mean + 95% CI by weather 
 st.markdown('<div class="card">', unsafe_allow_html=True)
-st.subheader("3) Average Demand by Weather")
-fig, ax = plt.subplots(figsize=(4,2))
-weather_avg = filtered.groupby("weather_name")["count"].mean().sort_values(ascending=False).reset_index()
-sns.barplot(data=weather_avg, x="weather_name", y="count", ax=ax, palette='rocket')
-ax.set_xlabel("Weather")
-ax.set_ylabel("Average Count")
-ax.tick_params(axis='both', labelsize=8)
-plt.xticks(rotation=20, ha="right")
+st.subheader("3) Mean Rentals with 95% CI by Weather Category")
+
+fig, ax = plt.subplots(figsize=(8, 3.5))
+sns.barplot(x="weather", y="count", data=filtered, ci=95, ax=ax, palette="magma")
+ax.set_xlabel("Weather Category")
+ax.set_ylabel("Mean Total Rentals")
 st.pyplot(fig, use_container_width=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
 col3, col4 = st.columns(2)
 
-# 4: Temp vs Count
+# 4: Mean rentals vs hour of day 
 with col3:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("4) Temperature vs Demand")
-    fig, ax = plt.subplots()
-    sns.scatterplot(data=filtered, x="temp", y="count", alpha=0.5, ax=ax, palette='magma')
-    ax.set_xlabel("Temp (°C)")
-    ax.set_ylabel("Count")
+    st.subheader("4) Mean Rentals vs Hour of Day")
+
+    mean_rentals_by_hour = filtered.groupby("hour_of_day")["count"].mean().reset_index()
+
+    fig, ax = plt.subplots(figsize=(6, 3))
+    sns.lineplot(data=mean_rentals_by_hour, x="hour_of_day", y="count", marker="o", ax=ax)
+    ax.set_xlabel("Hour of Day")
+    ax.set_ylabel("Mean Total Rentals")
     st.pyplot(fig, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# 5: Correlation heatmap
-with col4:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("5) Correlation Heatmap")
-    fig, ax = plt.subplots()
-    corr_cols = ["temp", "atemp", "humidity", "windspeed", "casual", "registered", "count"]
-    corr = filtered[corr_cols].corr(numeric_only=True)
-    sns.heatmap(corr, annot=True, fmt=".2f", ax=ax)
-    st.pyplot(fig, use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+# 5: Correlation heatmap 
 
+st.markdown('<div class="card">', unsafe_allow_html=True)
+st.subheader("5) Correlation Heatmap (Numerical Features)")
+
+numeric_df = filtered.select_dtypes(include=["number"])
+corr = numeric_df.corr(numeric_only=True)
+
+fig, ax = plt.subplots(figsize=(8, 6))
+sns.heatmap(corr, annot=True, ax=ax)
+st.pyplot(fig, use_container_width=True)
+st.markdown("</div>", unsafe_allow_html=True)
