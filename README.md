@@ -8,6 +8,7 @@ Interactive analysis and dashboard for the Washington D.C. bike sharing dataset 
 Analyze how **weather and temporal factors** affect bike rental demand and summarize insights using an **interactive Streamlit dashboard**.
 
 Dataset source: Kaggle (Bike Sharing Demand – `train.csv`)
+Used this after cleaning in streamlit to show visualizations - `newtrain`
 
 ---
 
