@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 
 st.set_page_config(
-    page_title="Bike Sharing Dashboard (Cleaned Data)",
+    page_title="Bike Sharing Dashboard",
     layout="wide",
     initial_sidebar_state="expanded",
 )
